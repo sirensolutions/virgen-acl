@@ -34,13 +34,110 @@ require('should');
 
      // kibi: added by us
     describe('multiple conflicting roles respecting the LIFO', function () {
-      
-        it('deny role is last', function(done) {
-          var user = new User(['admin', 'user']);
+
+
+        it('one role, allow, deny', function(done) {
+          this.acl.addResource('type:*')
+          this.acl.addResource('type:dashboard', 'type:*')
+          this.acl.addResource('dashboard:A', 'type:dashboard')
+          this.acl.addRole('user');
+
+          this.acl.allow('user', 'type:dashboard', 'view');
+          this.acl.deny('user', 'dashboard:A', 'view');
+          
+          this.acl.query('user', 'dashboard:A', 'view', function(err, allowed) {
+            allowed.should.equal(false);
+            done();
+          });
+        });
+
+        it('one role, deny, allow', function(done) {
+          this.acl.addResource('type:*')
+          this.acl.addResource('type:dashboard', 'type:*')
+          this.acl.addResource('dashboard:A', 'type:dashboard')
+          this.acl.addRole('user');
+
+          this.acl.deny('user', 'dashboard:A', 'view');
+          this.acl.allow('user', 'type:dashboard', 'view');
+          
+          this.acl.query('user', 'dashboard:A', 'view', function(err, allowed) {
+            allowed.should.equal(false);
+            done();
+          });
+        });
+
+
+        it('conflicting permission same role, resource with parent, allow first', function(done) {
+          var admin = new User('admin');
+          var user = new User('user');
+          var parentR = new Resource('type:dashboard');
+          var childR = new Resource('dashboard:A', 'type:dashboard');
+          this.acl.addRole('admin');
+          this.acl.addRole('user');
+
+          this.acl.allow('admin', 'type:dashboard', 'action');
+          this.acl.allow('user', 'type:dashboard', 'action');
+          this.acl.deny('user', 'dashboard:A', 'action');
+          
+          this.acl.query(user, childR, 'action', function(err, allowed) {
+            allowed.should.equal(false);
+            done();
+          });
+        });
+
+        it('conflicting permission same role, resource with parent, allow first', function(done) {
+          var admin = new User('admin');
+          var user = new User('user');
+          var parentR = new Resource('type:dashboard');
+          var childR = new Resource('dashboard:A', 'type:dashboard');
+          this.acl.addRole('admin');
+          this.acl.addRole('user');
+
+          this.acl.deny('user', 'dashboard:A', 'action');
+          this.acl.allow('admin', 'type:dashboard', 'action');
+          this.acl.allow('user', 'type:dashboard', 'action');
+          
+          this.acl.query(user, childR, 'action', function(err, allowed) {
+            allowed.should.equal(false);
+            done();
+          });
+        });
+
+        it('conflicting permission same role, resource with parent, allow first', function(done) {
+          var admin = new User('admin');
+          var parentR = new Resource('type:dashboard');
+          var childR = new Resource('dashboardA', 'type:dashboard');
+
+          this.acl.allow('admin', 'type:dashboard', 'action');
+          this.acl.deny('admin', 'dashboardA', 'action');
+          
+          this.acl.query(admin, childR, 'action', function(err, allowed, type) {
+            allowed.should.equal(false);
+            done();
+          });
+        });
+
+        it('conflicting permission same role, resource with parent, deny first', function(done) {
+          var admin = new User('admin');
+          var parentR = new Resource('type:dashboard');
+          var childR = new Resource('dashboardA', 'type:dashboard');
+
+          this.acl.deny('admin', 'dashboardA', 'action');
+          this.acl.allow('admin', 'type:dashboard', 'action');
+          
+          this.acl.query(admin, childR, 'action', function(err, allowed, type) {
+            allowed.should.equal(false);
+            done();
+          });
+        });
+
+        /*
+        it('conflicting permission same role, allow first', function(done) {
+          var user = new User(['admin']);
           var resource = new Resource();
 
           this.acl.allow('admin', 'resource', 'action');
-          this.acl.deny('user', 'resource', 'action');
+          this.acl.deny('admin', 'resource', 'action');
           
           this.acl.query(user, resource, 'action', function(err, allowed, type) {
             allowed.should.equal(false);
@@ -49,6 +146,21 @@ require('should');
           });
         });
         
+        it('conflicting permission same role, deny first', function(done) {
+          var user = new User(['admin']);
+          var resource = new Resource();
+
+          this.acl.deny('admin', 'resource', 'action');
+          this.acl.allow('admin', 'resource', 'action');
+          
+          this.acl.query(user, resource, 'action', function(err, allowed, type) {
+            allowed.should.equal(true);
+            type.should.equal(PermissionType.ALLOW);
+            done();
+          });
+        });
+
+
         it('deny role is first', function(done) {
           var user = new User(['admin', 'user']);
           var resource = new Resource();
@@ -99,6 +211,7 @@ require('should');
             done();
           });
         });
+        */
     });
     // kibi: end
 
