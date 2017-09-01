@@ -4,6 +4,7 @@ require('should');
 // index.js - Test main virgen-acl export
 (function() {
   var assert = require('assert')
+    , PermissionType = require('../lib/permission_type') // kibi: added by us
     , Acl = require('../lib').Acl
     , roles = ['admin', 'member', 'guest', ['member', 'admin'], ['member', 'guest'], ['guest', 'member']]
     , resources = ['blog', 'page', 'site']
@@ -30,6 +31,148 @@ require('should');
     beforeEach(function() {
       this.acl = new Acl();
     });
+
+     // kibi: added by us
+    describe('multiple conflicting roles respecting the LIFO', function () {
+
+
+        it('one role, allow, deny', function(done) {
+          this.acl.addResource('type:*')
+          this.acl.addResource('type:dashboard', 'type:*')
+          this.acl.addResource('dashboard:A', 'type:dashboard')
+          this.acl.addRole('user');
+
+          this.acl.allow('user', 'type:dashboard', 'view');
+          this.acl.deny('user', 'dashboard:A', 'view');
+          
+          this.acl.query('user', 'dashboard:A', 'view', function(err, allowed, type) {
+            allowed.should.equal(false);
+            type.should.equal(PermissionType.DENY)
+            done();
+          });
+        });
+
+        it('one role, deny, allow', function(done) {
+          this.acl.addResource('type:*')
+          this.acl.addResource('type:dashboard', 'type:*')
+          this.acl.addResource('dashboard:A', 'type:dashboard')
+          this.acl.addRole('user');
+
+          this.acl.deny('user', 'dashboard:A', 'view');
+          this.acl.allow('user', 'type:dashboard', 'view');
+          
+          this.acl.query('user', 'dashboard:A', 'view', function(err, allowed, type) {
+            allowed.should.equal(true);
+            type.should.equal(PermissionType.ALLOW)
+            done();
+          });
+        });
+
+
+        it('conflicting permission same role, resource with parent, more strict rule last', function(done) {
+          this.acl.addResource('type:*')
+          this.acl.addResource('type:dashboard', 'type:*')
+          this.acl.addResource('dashboard:A', 'type:dashboard')
+          this.acl.addRole('user');
+          
+          this.acl.allow('user', 'type:dashboard', 'action');
+          this.acl.deny('user', 'dashboard:A', 'action');
+          
+          this.acl.query('user', 'dashboard:A', 'action', function(err, allowed, type) {
+            allowed.should.equal(false);
+            type.should.equal(PermissionType.DENY)
+            done();
+          });
+        });
+
+        it('conflicting permission same role, resource with parent, more strict rule first', function(done) {
+          this.acl.addResource('type:*')
+          this.acl.addResource('type:dashboard', 'type:*')
+          this.acl.addResource('dashboard:A', 'type:dashboard')
+          this.acl.addRole('user');
+          
+          this.acl.deny('user', 'dashboard:A', 'action');
+          this.acl.allow('user', 'type:dashboard', 'action');
+            
+          this.acl.query('user', 'dashboard:A', 'action', function(err, allowed, type) {
+            allowed.should.equal(true);
+            type.should.equal(PermissionType.ALLOW)
+            done();
+          });
+        });
+
+        it('conflicting permission different roles, deny last', function(done) {
+          this.acl.addResource('X')
+          this.acl.addRole('user');
+          this.acl.addRole('admin');
+          
+          this.acl.allow('user', 'X', 'action');
+          this.acl.deny('admin', 'X', 'action');
+          
+          this.acl.query(['user', 'admin'], 'X', 'action', function(err, allowed, type) {
+            allowed.should.equal(false);
+            type.should.equal(PermissionType.DENY);
+            done();
+          });
+        });
+        
+        it('conflicting permission different roles, allow last', function(done) {
+          this.acl.addResource('X')
+          this.acl.addRole('user');
+          this.acl.addRole('admin');
+          
+          this.acl.deny('admin', 'X', 'action');
+          this.acl.allow('user', 'X', 'action');
+          
+          this.acl.query(['user', 'admin'], 'X', 'action', function(err, allowed, type) {
+            allowed.should.equal(true);
+            type.should.equal(PermissionType.ALLOW);
+            done();
+          });
+        });
+
+        it('no deny rule', function(done) {
+          this.acl.addResource('X')
+          this.acl.addRole('user');
+          this.acl.addRole('admin');
+          
+          this.acl.allow('user', 'X', 'action');
+          
+          this.acl.query(['user', 'admin'], 'X', 'action', function(err, allowed, type) {
+            allowed.should.equal(true);
+            type.should.equal(PermissionType.ALLOW);
+            done();
+          });
+        });
+
+        it('no allow rule', function(done) {
+          this.acl.addResource('X')
+          this.acl.addRole('user');
+          this.acl.addRole('admin');
+          
+          this.acl.deny('admin', 'X', 'action');
+          
+          this.acl.query(['user', 'admin'], 'X', 'action', function(err, allowed, type) {
+            allowed.should.equal(false);
+            type.should.equal(PermissionType.DENY);
+            done();
+          });
+        });
+
+        it('no role at all', function(done) {
+          this.acl.addResource('X')
+          this.acl.addRole('user');
+          this.acl.addRole('admin');
+          
+          this.acl.query(['user', 'admin'], 'X', 'action', function(err, allowed, type) {
+            allowed.should.equal(false);
+            type.should.equal(PermissionType.INHERIT);
+            done();
+          });
+        });
+        
+    });
+    // kibi: end
 
     describe('role', function() {
       beforeEach(function() {
